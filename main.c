@@ -1,68 +1,77 @@
+#include <ThingSpeak.h>
 
-float val, voltage, temp;
-String ssid     = "wifiSimulado";
-String password = "senhaSimulada";
-String host     = "api.thingspeak.com";
-const int httpPort   = 80;
-String url     = "/update?api_key=96K7XHSV1WW2U7EZ&field1=0";
+#include <DHT.h>
+#include <DHT_U.h>
 
+#include <WiFi.h>
+#include <WiFiAP.h>
+#include <WiFiClient.h>
+#include <WiFiGeneric.h>
+#include <WiFiMulti.h>
+#include <WiFiSTA.h>
+#include <WiFiScan.h>
+#include <WiFiServer.h>
+#include <WiFiType.h>
+#include <WiFiUdp.h>
 
-void setupESP8266(void) {
+//dht definitions
+#define DHTPIN 23
+#define DHTTYPE DHT11 
 
-  Serial.begin(115200);
-  Serial.println("AT");
-  delay(10);
-  if (Serial.find("OK"))
-    Serial.println("OK");
-
-
- /*
- como no tinkercad nao possui modulo wifi pensaremos que aqui estaria
- um codigo para conectar ao wifi
- */
-  Serial.println("AT+CIPSTART=\"TCP\",\"" + host + "\"," + httpPort);
-  delay(50);
-  if (Serial.find("OK")){
-   Serial.println("ESP8266 Connectado ao servidor") ;
-  }else{
-    //devido ao modulo wifi não esar mais funcionando no tinkercad 100% das vezes teremos este erro
-   Serial.println("ESP8266 Erro ao se conectar ao servidor") ;
-  }
-}
-
-void anydata(void) {
-
-  val=analogRead(A0);
-  voltage=val*0.0048828125;
-  temp = (voltage - 0.5) * 100.0;
+//thingspeak definitions
+#define CHANNEL_ID  2096412
+#define CHANNEL_API_KEY "96K7XHSV1WW2U7EZ"
 
 
-  String httpPacket = "GET " + url + String(temp) + " HTTP/1.1\r\nHost: " + host + "\r\n\r\n";
-  int length = httpPacket.length();
+//WIFI fields
+const char* ssid = "iPhone de Vinicius";
+const char* password =  "Hanselvi";
 
+//thingspeak field
+WiFiClient client;
 
-  Serial.print("AT+CIPSEND=");
-  Serial.println(length);
-  delay(10);
-
-
-  Serial.print(httpPacket);
-  delay(10);
-  if (Serial.find("SEND OK\r\n"))
-    Serial.println("ESP8266 enviou dados para o servidor");
-
-}
-
+//dht field
+DHT dht (DHTPIN,DHTTYPE);
 
 void setup() {
-  pinMode(A0, INPUT);
-  setupESP8266();
+Serial.begin(115200);
+
+//conexao com wifi e DHT11
+WiFi.begin(ssid, password);
+
+dht.begin();
+ while (WiFi.status() != WL_CONNECTED) {
+  delay(500);
+  Serial.println("Connecting to WiFi..");
+ }
+ Serial.println("Connected to the WiFi network");
+
+ ThingSpeak.begin(client);
+
 
 }
 
 void loop() {
+  //leitura constante de temperatura e humidade
+  float temperature = dht.readTemperature();
+  float humidity = dht.readHumidity();
 
- anydata();
 
-  delay(4000);
+
+ if (isnan(temperature)) {
+    Serial.println(F("Failed to read from DHT sensor!"));
+    return;
+  }
+
+  Serial.print("C: \n");
+  Serial.print(temperature);
+  delay(500);
+  Serial.print("\n humidade: \n");
+  Serial.print(humidity);
+
+
+  ThingSpeak.writeField(CHANNEL_ID,1,temperature,CHANNEL_API_KEY);
+  ThingSpeak.writeField(CHANNEL_ID,2,humidity,CHANNEL_API_KEY);
+
+  delay(15000);
 }
